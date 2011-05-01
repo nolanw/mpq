@@ -8,7 +8,12 @@ GEM
       bundler (~> 1.0.0)
       git (>= 1.2.5)
       rake
+    mustache (0.99.3)
     rake (0.8.7)
+    rdiscount (1.6.8)
+    rocco (0.6)
+      mustache
+      rdiscount
 
 PLATFORMS
   ruby
@@ -18,3 +23,4 @@ DEPENDENCIES
   bundler (~> 1.0.0)
   bzip2-ruby (~> 0.2.7)
   jeweler (~> 1.5.2)
+  rocco (~> 0.6)

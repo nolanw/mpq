@@ -10,4 +10,5 @@ gem "bzip2-ruby", "~> 0.2.7"
 group :development do
   gem "bundler", "~> 1.0.0"
   gem "jeweler", "~> 1.5.2"
+  gem "rocco", "~> 0.6"
 end
