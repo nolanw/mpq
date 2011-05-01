@@ -11,18 +11,20 @@ require 'rake'
 
 require 'jeweler'
 Jeweler::Tasks.new do |gem|
-  # gem is a Gem::Specification... see http://docs.rubygems.org/read/chapter/20 for more options
+  # gem is a Gem::Specification... see 
+  # http://docs.rubygems.org/read/chapter/20 for more options
   gem.name = "mpq"
   gem.homepage = "http://github.com/nolanw/mpq"
-  gem.license = "MIT"
-  gem.summary = %Q{TODO: one-line summary of your gem}
-  gem.description = %Q{TODO: longer description of your gem}
+  gem.license = "WTFPL"
+  gem.summary = %Q{Read files and metadata from MPQ archives}
+  gem.description = %Q{Read files and metadata from MPQ archives}
   gem.email = "nolan@nolanw.ca"
   gem.authors = ["Nolan Waite"]
-  # Include your dependencies below. Runtime dependencies are required when using your gem,
-  # and development dependencies are only needed for development (ie running rake tasks, tests, etc)
-  #  gem.add_runtime_dependency 'jabber4r', '> 0.1'
-  #  gem.add_development_dependency 'rspec', '> 1.2.3'
+  # Include your dependencies below. Runtime dependencies are required when 
+  # using your gem, and development dependencies are only needed for 
+  # development (ie running rake tasks, tests, etc)
+  gem.add_runtime_dependency 'bindata', '>= 1.3.1'
+  gem.add_development_dependency 'rocco', '>= 0.6'
 end
 Jeweler::RubygemsDotOrgTasks.new
 
@@ -33,21 +35,9 @@ Rake::TestTask.new(:test) do |test|
   test.verbose = true
 end
 
-require 'rcov/rcovtask'
-Rcov::RcovTask.new do |test|
-  test.libs << 'test'
-  test.pattern = 'test/**/test_*.rb'
-  test.verbose = true
+desc "Prepare the mpq documentation"
+task :docs do
+  system("cd lib && rocco -o ../docs *.rb")
 end
 
 task :default => :test
-
-require 'rake/rdoctask'
-Rake::RDocTask.new do |rdoc|
-  version = File.exist?('VERSION') ? File.read('VERSION') : ""
-
-  rdoc.rdoc_dir = 'rdoc'
-  rdoc.title = "mpq #{version}"
-  rdoc.rdoc_files.include('README*')
-  rdoc.rdoc_files.include('lib/**/*.rb')
-end
