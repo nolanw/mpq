@@ -5,11 +5,11 @@
 
 Gem::Specification.new do |s|
   s.name = %q{mpq}
-  s.version = "0.1.0"
+  s.version = "0.2.0"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Nolan Waite"]
-  s.date = %q{2011-05-01}
+  s.date = %q{2011-06-16}
   s.description = %q{Read files and metadata from MPQ archives}
   s.email = %q{nolan@nolanw.ca}
   s.extra_rdoc_files = [
@@ -23,10 +23,15 @@ Gem::Specification.new do |s|
     "README.md",
     "Rakefile",
     "VERSION",
+    "lib/jsonish.rb",
     "lib/mpq.rb",
+    "lib/replay_file.rb",
+    "mpq.gemspec",
     "test/helper.rb",
     "test/some.SC2Replay",
-    "test/test_mpq.rb"
+    "test/test_jsonish.rb",
+    "test/test_mpq.rb",
+    "test/test_replay_file.rb"
   ]
   s.homepage = %q{http://github.com/nolanw/mpq}
   s.licenses = ["WTFPL"]
@@ -35,7 +40,9 @@ Gem::Specification.new do |s|
   s.summary = %q{Read files and metadata from MPQ archives}
   s.test_files = [
     "test/helper.rb",
-    "test/test_mpq.rb"
+    "test/test_jsonish.rb",
+    "test/test_mpq.rb",
+    "test/test_replay_file.rb"
   ]
 
   if s.respond_to? :specification_version then
