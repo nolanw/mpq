@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="content-type" content="text/html;charset=utf-8">
+  <title>mpq.rb</title>
+  <link rel="stylesheet" href="http://github.com/jashkenas/docco/raw/0.3.0/resources/docco.css">
+</head>
+<body>
+<div id='container'>
+  <div id="background"></div>
+  <div id="jump_to">
+    Jump To &hellip;
+    <div id="jump_wrapper">
+      <div id="jump_page">
+          <a class="source" href="jsonish.html">jsonish.rb</a>
+          <a class="source" href="mpq.html">mpq.rb</a>
+          <a class="source" href="replay_file.html">replay_file.rb</a>
+      </div>
+    </div>
+  </div>
+  <table cellspacing=0 cellpadding=0>
+  <thead>
+    <tr>
+      <th class=docs><h1>mpq.rb</h1></th>
+      <th class=code></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr id='section-1'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-1">&#182;</a>
+        </div>
+        <p>Read files and metadata from MPQ archives.</p>
+
+<p>We&rsquo;ll use <code>bindata</code> as a DSL for binary extraction, and since we only care
+about StarCraft 2 replays at the moment, the only decompression we need is
+<code>bzip2</code>.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre><span class="nb">require</span> <span class="s1">&#39;bindata&#39;</span>
+<span class="nb">require</span> <span class="s1">&#39;bzip2&#39;</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-2'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-2">&#182;</a>
+        </div>
+        <p>A massive thanks to Justin Olbrantz (Quantam) and Jean-Francois Roy
+(BahamutZERO), whose <a href="http://wiki.devklog.net/index.php?title=The_MoPaQ_Archive_Format">documentation of the MPQ
+format</a> was
+instrumental for this implementation.</p>
+
+<p>Thanks to Aku Kotkavuo (arkx) for <a href="https://github.com/arkx/mpyq">mpyq</a>, which
+clarified a bunch of the implementation details that I couldn&rsquo;t distill from
+the documentation mentioned above.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre><span class="k">module</span> <span class="nn">MPQ</span>
+  <span class="k">class</span> <span class="nc">Archive</span>
+    </pre></div>
+      </td>
+    </tr>
+    <tr id='section-3'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-3">&#182;</a>
+        </div>
+        <p>In general, MPQ archives start with either the MPQ header, or they start
+with a user header which points to the MPQ header. StarCraft 2 replays
+always have a user header, so we don&rsquo;t even bother to check here.</p>
+
+<p>The MPQ header points to two very helpful parts of the MPQ archive: the
+hash table, which tells us where the contents of files are found, and the
+block table, which holds said contents of files. That&rsquo;s all we need to
+read up front.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>    <span class="k">def</span> <span class="nf">initialize</span> <span class="n">io</span>
+      <span class="vi">@io</span> <span class="o">=</span> <span class="n">io</span>
+      <span class="vi">@user_header</span> <span class="o">=</span> <span class="no">UserHeader</span><span class="o">.</span><span class="n">read</span> <span class="vi">@io</span>
+      <span class="vi">@io</span><span class="o">.</span><span class="n">seek</span> <span class="vi">@user_header</span><span class="o">.</span><span class="n">archive_header_offset</span>
+      <span class="vi">@archive_header</span> <span class="o">=</span> <span class="no">ArchiveHeader</span><span class="o">.</span><span class="n">read</span> <span class="vi">@io</span>
+      <span class="vi">@hash_table</span> <span class="o">=</span> <span class="n">read_table</span> <span class="ss">:hash</span>
+      <span class="vi">@block_table</span> <span class="o">=</span> <span class="n">read_table</span> <span class="ss">:block</span>
+    <span class="k">end</span>
+    </pre></div>
+      </td>
+    </tr>
+    <tr id='section-4'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-4">&#182;</a>
+        </div>
+        <p>Both the hash and block tables' contents are hashed (in the same way), so
+we need to decrypt them in order to read their contents.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>    <span class="k">def</span> <span class="nf">read_table</span> <span class="n">table</span>
+      <span class="n">table_offset</span> <span class="o">=</span> <span class="vi">@archive_header</span><span class="o">.</span><span class="n">send</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="n">table</span><span class="si">}</span><span class="s2">_table_offset&quot;</span>
+      <span class="vi">@io</span><span class="o">.</span><span class="n">seek</span> <span class="vi">@user_header</span><span class="o">.</span><span class="n">archive_header_offset</span> <span class="o">+</span> <span class="n">table_offset</span>
+      <span class="n">table_entries</span> <span class="o">=</span> <span class="vi">@archive_header</span><span class="o">.</span><span class="n">send</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="n">table</span><span class="si">}</span><span class="s2">_table_entries&quot;</span>
+      <span class="n">data</span> <span class="o">=</span> <span class="vi">@io</span><span class="o">.</span><span class="n">read</span> <span class="n">table_entries</span> <span class="o">*</span> <span class="mi">16</span>
+      <span class="n">key</span> <span class="o">=</span> <span class="no">Hashing</span><span class="o">::</span><span class="n">hash_for</span> <span class="ss">:table</span><span class="p">,</span> <span class="s2">&quot;(</span><span class="si">#{</span><span class="n">table</span><span class="si">}</span><span class="s2"> table)&quot;</span>
+      <span class="n">data</span> <span class="o">=</span> <span class="no">Hashing</span><span class="o">::</span><span class="n">decrypt</span> <span class="n">data</span><span class="p">,</span> <span class="n">key</span>
+      <span class="n">klass</span> <span class="o">=</span> <span class="n">table</span> <span class="o">==</span> <span class="ss">:hash</span> <span class="p">?</span> <span class="no">HashTableEntry</span> <span class="p">:</span> <span class="no">BlockTableEntry</span>
+      <span class="p">(</span><span class="mi">0</span><span class="o">.</span><span class="n">.</span><span class="o">.</span><span class="n">table_entries</span><span class="p">)</span><span class="o">.</span><span class="n">map</span> <span class="k">do</span> <span class="o">|</span><span class="n">i</span><span class="o">|</span>
+        <span class="n">klass</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">data</span><span class="o">[</span><span class="n">i</span> <span class="o">*</span> <span class="mi">16</span><span class="p">,</span> <span class="mi">16</span><span class="o">]</span><span class="p">)</span>
+      <span class="k">end</span>
+    <span class="k">end</span>
+    </pre></div>
+      </td>
+    </tr>
+    <tr id='section-5'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-5">&#182;</a>
+        </div>
+        <p>To read a file from the MPQ archive, we need to locate its blocks.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>    <span class="k">def</span> <span class="nf">read_file</span> <span class="n">filename</span>
+      </pre></div>
+      </td>
+    </tr>
+    <tr id='section-6'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-6">&#182;</a>
+        </div>
+        <p>The first block location is stored in the hash table.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>      <span class="n">hash_a</span> <span class="o">=</span> <span class="no">Hashing</span><span class="o">::</span><span class="n">hash_for</span> <span class="ss">:hash_a</span><span class="p">,</span> <span class="n">filename</span>
+      <span class="n">hash_b</span> <span class="o">=</span> <span class="no">Hashing</span><span class="o">::</span><span class="n">hash_for</span> <span class="ss">:hash_b</span><span class="p">,</span> <span class="n">filename</span>
+      <span class="n">hash_entry</span> <span class="o">=</span> <span class="vi">@hash_table</span><span class="o">.</span><span class="n">find</span> <span class="k">do</span> <span class="o">|</span><span class="n">h</span><span class="o">|</span>
+        <span class="o">[</span><span class="n">h</span><span class="o">.</span><span class="n">hash_a</span><span class="p">,</span> <span class="n">h</span><span class="o">.</span><span class="n">hash_b</span><span class="o">]</span> <span class="o">==</span> <span class="o">[</span><span class="n">hash_a</span><span class="p">,</span> <span class="n">hash_b</span><span class="o">]</span>
+      <span class="k">end</span>
+      <span class="k">unless</span> <span class="n">hash_entry</span>
+        <span class="k">return</span> <span class="kp">nil</span>
+      <span class="k">end</span>
+      <span class="n">block_entry</span> <span class="o">=</span> <span class="vi">@block_table</span><span class="o">[</span><span class="n">hash_entry</span><span class="o">.</span><span class="n">block_index</span><span class="o">]</span>
+      <span class="k">unless</span> <span class="n">block_entry</span><span class="o">.</span><span class="n">file?</span>
+        <span class="k">return</span> <span class="kp">nil</span> 
+      <span class="k">end</span>
+      <span class="vi">@io</span><span class="o">.</span><span class="n">seek</span> <span class="vi">@user_header</span><span class="o">.</span><span class="n">archive_header_offset</span> <span class="o">+</span> <span class="n">block_entry</span><span class="o">.</span><span class="n">block_offset</span>
+      <span class="n">file_data</span> <span class="o">=</span> <span class="vi">@io</span><span class="o">.</span><span class="n">read</span> <span class="n">block_entry</span><span class="o">.</span><span class="n">archived_size</span>
+      </pre></div>
+      </td>
+    </tr>
+    <tr id='section-7'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-7">&#182;</a>
+        </div>
+        <p>Blocks can be encrypted. Decryption isn&rsquo;t currently implemented as none
+of the blocks in a StarCraft 2 replay are encrypted.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>      <span class="k">if</span> <span class="n">block_entry</span><span class="o">.</span><span class="n">encrypted?</span>
+        <span class="k">return</span> <span class="kp">nil</span>
+      <span class="k">end</span>
+      </pre></div>
+      </td>
+    </tr>
+    <tr id='section-8'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-8">&#182;</a>
+        </div>
+        <p>Files can consist of one or many blocks. In either case, each block
+(or <em>sector</em>) is read and individually decompressed if needed, then
+stitched together for the final result.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>      <span class="k">if</span> <span class="n">block_entry</span><span class="o">.</span><span class="n">single_unit?</span>
+        <span class="k">if</span> <span class="n">block_entry</span><span class="o">.</span><span class="n">compressed?</span>
+          <span class="k">if</span> <span class="n">file_data</span><span class="o">.</span><span class="n">bytes</span><span class="o">.</span><span class="n">next</span> <span class="o">==</span> <span class="mi">16</span>
+            <span class="n">file_data</span> <span class="o">=</span> <span class="no">Bzip2</span><span class="o">.</span><span class="n">uncompress</span> <span class="n">file_data</span><span class="o">[</span><span class="mi">1</span><span class="p">,</span> <span class="n">file_data</span><span class="o">.</span><span class="n">length</span><span class="o">]</span>
+          <span class="k">end</span>
+        <span class="k">end</span>
+        <span class="k">return</span> <span class="n">file_data</span> 
+      <span class="k">end</span>
+      <span class="n">sector_size</span> <span class="o">=</span> <span class="mi">512</span> <span class="o">&lt;&lt;</span> <span class="vi">@archive_header</span><span class="o">.</span><span class="n">sector_size_shift</span>
+      <span class="n">sectors</span> <span class="o">=</span> <span class="n">block_entry</span><span class="o">.</span><span class="n">size</span> <span class="o">/</span> <span class="n">sector_size</span> <span class="o">+</span> <span class="mi">1</span>
+      <span class="k">if</span> <span class="n">block_entry</span><span class="o">.</span><span class="n">has_checksums</span>
+        <span class="n">sectors</span> <span class="o">+=</span> <span class="mi">1</span>
+      <span class="k">end</span>
+      <span class="n">positions</span> <span class="o">=</span> <span class="n">file_data</span><span class="o">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">4</span> <span class="o">*</span> <span class="p">(</span><span class="n">sectors</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span><span class="o">].</span><span class="n">unpack</span> <span class="s2">&quot;V</span><span class="si">#{</span><span class="n">sectors</span> <span class="o">+</span> <span class="mi">1</span><span class="si">}</span><span class="s2">&quot;</span>
+      <span class="n">sectors</span> <span class="o">=</span> <span class="o">[]</span>
+      <span class="n">positions</span><span class="o">.</span><span class="n">each_with_index</span> <span class="k">do</span> <span class="o">|</span><span class="n">pos</span><span class="p">,</span> <span class="n">i</span><span class="o">|</span>
+        <span class="k">break</span> <span class="k">if</span> <span class="n">i</span> <span class="o">+</span> <span class="mi">1</span> <span class="o">==</span> <span class="n">positions</span><span class="o">.</span><span class="n">length</span>
+        <span class="n">sector</span> <span class="o">=</span> <span class="n">file_data</span><span class="o">[</span><span class="n">pos</span><span class="p">,</span> <span class="n">positions</span><span class="o">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="o">]</span> <span class="o">-</span> <span class="n">pos</span><span class="o">]</span>
+        <span class="k">if</span> <span class="n">block_entry</span><span class="o">.</span><span class="n">compressed?</span>
+          <span class="k">if</span> <span class="n">block_entry</span><span class="o">.</span><span class="n">size</span> <span class="o">&gt;</span> <span class="n">block_entry</span><span class="o">.</span><span class="n">archived_size</span>
+            <span class="k">if</span> <span class="n">sector</span><span class="o">.</span><span class="n">bytes</span><span class="o">.</span><span class="n">next</span> <span class="o">==</span> <span class="mi">16</span>
+              <span class="n">sector</span> <span class="o">=</span> <span class="no">Bzip2</span><span class="o">.</span><span class="n">uncompress</span> <span class="n">sector</span>
+            <span class="k">end</span>
+          <span class="k">end</span>
+        <span class="k">end</span>
+        <span class="n">sectors</span> <span class="o">&lt;&lt;</span> <span class="n">sector</span>
+      <span class="k">end</span>
+      <span class="n">sectors</span><span class="o">.</span><span class="n">join</span> <span class="s1">&#39;&#39;</span>
+    <span class="k">end</span>
+  <span class="k">end</span>
+  </pre></div>
+      </td>
+    </tr>
+    <tr id='section-9'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-9">&#182;</a>
+        </div>
+        <p>Various hashes are used throughout MPQ archives.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>  <span class="k">module</span> <span class="nn">Hashing</span>
+    </pre></div>
+      </td>
+    </tr>
+    <tr id='section-10'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-10">&#182;</a>
+        </div>
+        <p>The algorithm is unchanged across hash types, but the first step in the
+hashing differs depending on what we&rsquo;re hashing.</p>
+
+<p>Both this hashing and the decryption below make use of a precalculated
+table of values.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>    <span class="k">def</span> <span class="nc">self</span><span class="o">.</span><span class="nf">hash_for</span> <span class="n">hash_type</span><span class="p">,</span> <span class="n">s</span>
+      <span class="n">hash_type</span> <span class="o">=</span> <span class="o">[</span><span class="ss">:table_offset</span><span class="p">,</span> <span class="ss">:hash_a</span><span class="p">,</span> <span class="ss">:hash_b</span><span class="p">,</span> <span class="ss">:table</span><span class="o">].</span><span class="n">index</span> <span class="n">hash_type</span>
+      <span class="n">seed1</span><span class="p">,</span> <span class="n">seed2</span> <span class="o">=</span> <span class="mh">0x7FED7FED</span><span class="p">,</span> <span class="mh">0xEEEEEEEE</span>
+      <span class="n">s</span><span class="o">.</span><span class="n">upcase</span><span class="o">.</span><span class="n">each_byte</span> <span class="k">do</span> <span class="o">|</span><span class="n">c</span><span class="o">|</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="vi">@encryption_table</span><span class="o">[</span><span class="p">(</span><span class="n">hash_type</span> <span class="o">&lt;&lt;</span> <span class="mi">8</span><span class="p">)</span> <span class="o">+</span> <span class="n">c</span><span class="o">]</span>
+        </pre></div>
+      </td>
+    </tr>
+    <tr id='section-11'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-11">&#182;</a>
+        </div>
+        <p>The seemingly pointless <code>AND</code>ing by 32 ones is because Ruby&rsquo;s numbers
+are arbitrary precision. Normally that&rsquo;s great, but right now that&rsquo;s
+actually unhelpful.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>        <span class="n">seed1</span> <span class="o">=</span> <span class="p">(</span><span class="n">value</span> <span class="o">^</span> <span class="p">(</span><span class="n">seed1</span> <span class="o">+</span> <span class="n">seed2</span><span class="p">))</span> <span class="o">&amp;</span> <span class="mh">0xFFFFFFFF</span>
+        <span class="n">seed2</span> <span class="o">=</span> <span class="p">(</span><span class="n">c</span> <span class="o">+</span> <span class="n">seed1</span> <span class="o">+</span> <span class="n">seed2</span> <span class="o">+</span> <span class="p">(</span><span class="n">seed2</span> <span class="o">&lt;&lt;</span> <span class="mi">5</span><span class="p">)</span> <span class="o">+</span> <span class="mi">3</span><span class="p">)</span> <span class="o">&amp;</span> <span class="mh">0xFFFFFFFF</span>
+      <span class="k">end</span>
+      <span class="n">seed1</span>
+    <span class="k">end</span>
+    </pre></div>
+      </td>
+    </tr>
+    <tr id='section-12'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-12">&#182;</a>
+        </div>
+        <p>Data in the hash and block tables can be decrypted using this algorithm.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>    <span class="k">def</span> <span class="nc">self</span><span class="o">.</span><span class="nf">decrypt</span> <span class="n">data</span><span class="p">,</span> <span class="n">seed1</span>
+      <span class="n">seed2</span> <span class="o">=</span> <span class="mh">0xEEEEEEEE</span>
+      <span class="n">data</span><span class="o">.</span><span class="n">unpack</span><span class="p">(</span><span class="s1">&#39;V*&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">map</span> <span class="k">do</span> <span class="o">|</span><span class="n">value</span><span class="o">|</span>
+        </pre></div>
+      </td>
+    </tr>
+    <tr id='section-13'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-13">&#182;</a>
+        </div>
+        <p>Again, the <code>AND</code>s here forces 32-bit precision.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>        <span class="n">seed2</span> <span class="o">=</span> <span class="p">(</span><span class="n">seed2</span> <span class="o">+</span> <span class="vi">@encryption_table</span><span class="o">[</span><span class="mh">0x400</span> <span class="o">+</span> <span class="p">(</span><span class="n">seed1</span> <span class="o">&amp;</span> <span class="mh">0xFF</span><span class="p">)</span><span class="o">]</span><span class="p">)</span> <span class="o">&amp;</span> <span class="mh">0xFFFFFFFF</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="p">(</span><span class="n">value</span> <span class="o">^</span> <span class="p">(</span><span class="n">seed1</span> <span class="o">+</span> <span class="n">seed2</span><span class="p">))</span> <span class="o">&amp;</span> <span class="mh">0xFFFFFFFF</span>
+        <span class="n">seed1</span> <span class="o">=</span> <span class="p">(((</span><span class="o">~</span><span class="n">seed1</span> <span class="o">&lt;&lt;</span> <span class="mh">0x15</span><span class="p">)</span> <span class="o">+</span> <span class="mh">0x11111111</span><span class="p">)</span> <span class="o">|</span> <span class="p">(</span><span class="n">seed1</span> <span class="o">&gt;&gt;</span> <span class="mh">0x0B</span><span class="p">))</span> <span class="o">&amp;</span> <span class="mh">0xFFFFFFFF</span>
+        <span class="n">seed2</span> <span class="o">=</span> <span class="p">(</span><span class="n">value</span> <span class="o">+</span> <span class="n">seed2</span> <span class="o">+</span> <span class="p">(</span><span class="n">seed2</span> <span class="o">&lt;&lt;</span> <span class="mi">5</span><span class="p">)</span> <span class="o">+</span> <span class="mi">3</span><span class="p">)</span> <span class="o">&amp;</span> <span class="mh">0xFFFFFFFF</span>
+        <span class="n">value</span>
+      <span class="k">end</span><span class="o">.</span><span class="n">pack</span><span class="p">(</span><span class="s1">&#39;V*&#39;</span><span class="p">)</span>
+    <span class="k">end</span>
+    </pre></div>
+      </td>
+    </tr>
+    <tr id='section-14'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-14">&#182;</a>
+        </div>
+        <p>This table is used for the above hashing and decryption routines.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>    <span class="n">seed</span> <span class="o">=</span> <span class="mh">0x00100001</span>
+    <span class="vi">@encryption_table</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="p">(</span><span class="mi">0</span><span class="o">.</span><span class="n">.</span><span class="mi">255</span><span class="p">)</span><span class="o">.</span><span class="n">each</span> <span class="k">do</span> <span class="o">|</span><span class="n">i</span><span class="o">|</span>
+      <span class="n">index</span> <span class="o">=</span> <span class="n">i</span>
+      <span class="p">(</span><span class="mi">0</span><span class="o">.</span><span class="n">.</span><span class="mi">4</span><span class="p">)</span><span class="o">.</span><span class="n">each</span> <span class="k">do</span> <span class="o">|</span><span class="n">j</span><span class="o">|</span>
+        <span class="n">seed</span> <span class="o">=</span> <span class="p">(</span><span class="n">seed</span> <span class="o">*</span> <span class="mi">125</span> <span class="o">+</span> <span class="mi">3</span><span class="p">)</span> <span class="o">%</span> <span class="mh">0x2AAAAB</span>
+        <span class="n">tmp1</span> <span class="o">=</span> <span class="p">(</span><span class="n">seed</span> <span class="o">&amp;</span> <span class="mh">0xFFFF</span><span class="p">)</span> <span class="o">&lt;&lt;</span> <span class="mh">0x10</span>
+        <span class="n">seed</span> <span class="o">=</span> <span class="p">(</span><span class="n">seed</span> <span class="o">*</span> <span class="mi">125</span> <span class="o">+</span> <span class="mi">3</span><span class="p">)</span> <span class="o">%</span> <span class="mh">0x2AAAAB</span>
+        <span class="n">tmp2</span> <span class="o">=</span> <span class="p">(</span><span class="n">seed</span> <span class="o">&amp;</span> <span class="mh">0xFFFF</span><span class="p">)</span>
+        <span class="vi">@encryption_table</span><span class="o">[</span><span class="n">i</span> <span class="o">+</span> <span class="n">j</span> <span class="o">*</span> <span class="mh">0x100</span><span class="o">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">tmp1</span> <span class="o">|</span> <span class="n">tmp2</span><span class="p">)</span>
+      <span class="k">end</span>
+    <span class="k">end</span>
+  <span class="k">end</span>
+  </pre></div>
+      </td>
+    </tr>
+    <tr id='section-15'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-15">&#182;</a>
+        </div>
+        <p>The layout of the user header, an optional part of MPQ archives. If it&rsquo;s
+present, it must be at the beginning of the archive.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>  <span class="k">class</span> <span class="nc">UserHeader</span> <span class="o">&lt;</span> <span class="no">BinData</span><span class="o">::</span><span class="no">Record</span>
+    <span class="n">endian</span> <span class="ss">:little</span>
+    </pre></div>
+      </td>
+    </tr>
+    <tr id='section-16'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-16">&#182;</a>
+        </div>
+        <p>This magic value is always the same: <code>MPQ\x1b</code>.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>    <span class="n">string</span> <span class="ss">:user_magic</span><span class="p">,</span> <span class="ss">:length</span> <span class="o">=&gt;</span> <span class="mi">4</span>
+    <span class="n">uint32</span> <span class="ss">:user_data_max_length</span>
+    <span class="n">uint32</span> <span class="ss">:archive_header_offset</span>
+    <span class="n">uint32</span> <span class="ss">:user_data_length</span>
+    <span class="n">string</span> <span class="ss">:user_data</span><span class="p">,</span> <span class="ss">:length</span> <span class="o">=&gt;</span> <span class="ss">:user_data_length</span>
+  <span class="k">end</span>
+  </pre></div>
+      </td>
+    </tr>
+    <tr id='section-17'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-17">&#182;</a>
+        </div>
+        <p>All MPQ archives have an archive header. It&rsquo;s located at the start of the
+archive, unless a user header is there, in which case the user header
+points to the location of this archive header.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>  <span class="k">class</span> <span class="nc">ArchiveHeader</span> <span class="o">&lt;</span> <span class="no">BinData</span><span class="o">::</span><span class="no">Record</span>
+    <span class="n">endian</span> <span class="ss">:little</span>
+    </pre></div>
+      </td>
+    </tr>
+    <tr id='section-18'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-18">&#182;</a>
+        </div>
+        <p>This magic value is always the same: <code>MPQ\x1a</code>.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>    <span class="n">string</span> <span class="ss">:archive_magic</span><span class="p">,</span> <span class="ss">:length</span> <span class="o">=&gt;</span> <span class="mi">4</span>
+    <span class="n">int32</span>  <span class="ss">:header_size</span>
+    <span class="n">int32</span>  <span class="ss">:archive_size</span>
+    <span class="n">int16</span>  <span class="ss">:format_version</span>
+    <span class="n">int8</span>   <span class="ss">:sector_size_shift</span>
+    <span class="n">int8</span>
+    <span class="n">int32</span>  <span class="ss">:hash_table_offset</span>
+    <span class="n">int32</span>  <span class="ss">:block_table_offset</span>
+    <span class="n">int32</span>  <span class="ss">:hash_table_entries</span>
+    <span class="n">int32</span>  <span class="ss">:block_table_entries</span>
+    <span class="n">int64</span>  <span class="ss">:extended_block_table_offset</span>
+    <span class="n">int16</span>  <span class="ss">:hash_table_offset_high</span>
+    <span class="n">int16</span>  <span class="ss">:block_table_offset_high</span>
+  <span class="k">end</span>
+  </pre></div>
+      </td>
+    </tr>
+    <tr id='section-19'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-19">&#182;</a>
+        </div>
+        <p>Each hash table entry follows this format. No idea what the spare byte is
+for.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>  <span class="k">class</span> <span class="nc">HashTableEntry</span> <span class="o">&lt;</span> <span class="no">BinData</span><span class="o">::</span><span class="no">Record</span>
+    <span class="n">endian</span> <span class="ss">:little</span>
+  
+    <span class="n">uint32</span> <span class="ss">:hash_a</span>
+    <span class="n">uint32</span> <span class="ss">:hash_b</span>
+    <span class="n">int16</span>  <span class="ss">:language</span>
+    <span class="n">int8</span>   <span class="ss">:platform</span>
+    <span class="n">int8</span>
+    <span class="n">int32</span>  <span class="ss">:block_index</span>
+  <span class="k">end</span>
+  </pre></div>
+      </td>
+    </tr>
+    <tr id='section-20'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-20">&#182;</a>
+        </div>
+        <p>Each block table follows this format. Although <code>BinData</code> can handle
+bitfields (<code>flags</code> in this case), I had problems setting them up, so I
+settled for methods instead.</p>
+
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>  <span class="k">class</span> <span class="nc">BlockTableEntry</span> <span class="o">&lt;</span> <span class="no">BinData</span><span class="o">::</span><span class="no">Record</span>
+    <span class="n">endian</span> <span class="ss">:little</span>
+  
+    <span class="n">int32</span>  <span class="ss">:block_offset</span>
+    <span class="n">int32</span>  <span class="ss">:archived_size</span>
+    <span class="n">int32</span>  <span class="ss">:file_size</span>
+    <span class="n">uint32</span> <span class="ss">:flags</span>
+  
+    <span class="k">def</span> <span class="nf">file?</span>
+      <span class="p">(</span><span class="n">flags</span> <span class="o">&amp;</span> <span class="mh">0x80000000</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">0</span>
+    <span class="k">end</span>
+    
+    <span class="k">def</span> <span class="nf">compressed?</span>
+      <span class="p">(</span><span class="n">flags</span> <span class="o">&amp;</span> <span class="mh">0x00000200</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">0</span>
+    <span class="k">end</span>
+  
+    <span class="k">def</span> <span class="nf">encrypted?</span>
+      <span class="p">(</span><span class="n">flags</span> <span class="o">&amp;</span> <span class="mh">0x00010000</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">0</span>
+    <span class="k">end</span>
+  
+    <span class="k">def</span> <span class="nf">single_unit?</span>
+      <span class="p">(</span><span class="n">flags</span> <span class="o">&amp;</span> <span class="mh">0x01000000</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">0</span>
+    <span class="k">end</span>
+  <span class="k">end</span>
+<span class="k">end</span></pre></div>
+      </td>
+    </tr>
+  </table>
+</div>
+</body>

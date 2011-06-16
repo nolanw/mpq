@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="content-type" content="text/html;charset=utf-8">
+  <title>replay_file.rb</title>
+  <link rel="stylesheet" href="http://github.com/jashkenas/docco/raw/0.3.0/resources/docco.css">
+</head>
+<body>
+<div id='container'>
+  <div id="background"></div>
+  <div id="jump_to">
+    Jump To &hellip;
+    <div id="jump_wrapper">
+      <div id="jump_page">
+          <a class="source" href="jsonish.html">jsonish.rb</a>
+          <a class="source" href="mpq.html">mpq.rb</a>
+          <a class="source" href="replay_file.html">replay_file.rb</a>
+      </div>
+    </div>
+  </div>
+  <table cellspacing=0 cellpadding=0>
+  <thead>
+    <tr>
+      <th class=docs><h1>replay_file.rb</h1></th>
+      <th class=code></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr id='section-1'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-1">&#182;</a>
+        </div>
+        <p>StarCraft 2 replay files are MPQ archives, with some data serialized as what
+I&rsquo;m calling <em>JSONish</em>. We also use <code>bindata</code> as a DSL for some of the file
+contents.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre><span class="nb">require</span> <span class="s1">&#39;bindata&#39;</span>
+<span class="nb">require</span> <span class="s1">&#39;mpq&#39;</span>
+<span class="nb">require</span> <span class="s1">&#39;jsonish&#39;</span>
+
+<span class="k">module</span> <span class="nn">MPQ</span>
+  <span class="k">class</span> <span class="nc">SC2ReplayFile</span> <span class="o">&lt;</span> <span class="no">Archive</span>
+  </pre></div>
+      </td>
+    </tr>
+    <tr id='section-2'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-2">&#182;</a>
+        </div>
+        <p>Game length is given as the number of frames.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>    <span class="k">def</span> <span class="nf">game_length</span>
+      <span class="vi">@game_length</span> <span class="o">||=</span> <span class="n">user_data</span><span class="o">[</span><span class="mi">3</span><span class="o">]</span> <span class="o">/</span> <span class="no">FRAMES_PER_SECOND</span>
+    <span class="k">end</span>
+  </pre></div>
+      </td>
+    </tr>
+    <tr id='section-3'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-3">&#182;</a>
+        </div>
+        <p>These are the numbers you see in the bottom left of the game&rsquo;s menu. Use
+the <code>build</code> to change features, etc. based on game version. Use the rest
+when presenting a version to a person.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>    <span class="k">def</span> <span class="nf">game_version</span>
+      <span class="vi">@game_version</span> <span class="o">||=</span> <span class="p">{</span>
+        <span class="ss">:major</span> <span class="o">=&gt;</span> <span class="n">user_data</span><span class="o">[</span><span class="mi">1</span><span class="o">][</span><span class="mi">1</span><span class="o">]</span><span class="p">,</span>
+        <span class="ss">:minor</span> <span class="o">=&gt;</span> <span class="n">user_data</span><span class="o">[</span><span class="mi">1</span><span class="o">][</span><span class="mi">2</span><span class="o">]</span><span class="p">,</span>
+        <span class="ss">:patch</span> <span class="o">=&gt;</span> <span class="n">user_data</span><span class="o">[</span><span class="mi">1</span><span class="o">][</span><span class="mi">3</span><span class="o">]</span><span class="p">,</span>
+        <span class="ss">:build</span> <span class="o">=&gt;</span> <span class="n">user_data</span><span class="o">[</span><span class="mi">1</span><span class="o">][</span><span class="mi">4</span><span class="o">]</span>
+      <span class="p">}</span>
+    <span class="k">end</span>
+  </pre></div>
+      </td>
+    </tr>
+    <tr id='section-4'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-4">&#182;</a>
+        </div>
+        <p>Player information is spread among a couple of files: the
+<code>replay.details</code> file and the <code>replay.attributes.events</code> file. Here we
+combine the information contained in each.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>    <span class="k">def</span> <span class="nf">players</span>
+      <span class="k">return</span> <span class="vi">@players</span> <span class="k">if</span> <span class="n">defined?</span> <span class="vi">@players</span>
+      <span class="vi">@players</span> <span class="o">=</span> <span class="n">details</span><span class="o">[</span><span class="mi">0</span><span class="o">].</span><span class="n">map</span> <span class="k">do</span> <span class="o">|</span><span class="n">player</span><span class="o">|</span>
+        <span class="p">{</span> <span class="ss">:name</span> <span class="o">=&gt;</span> <span class="n">player</span><span class="o">[</span><span class="mi">0</span><span class="o">]</span><span class="p">,</span>
+        </pre></div>
+      </td>
+    </tr>
+    <tr id='section-5'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-5">&#182;</a>
+        </div>
+        <p>This could probably be &lsquo;unknown&rsquo; in some circumstances I haven&rsquo;t
+yet checked.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>          <span class="ss">:outcome</span> <span class="o">=&gt;</span> <span class="no">OUTCOMES</span><span class="o">[</span><span class="n">player</span><span class="o">[</span><span class="mi">8</span><span class="o">]]</span>
+        <span class="p">}</span>
+      <span class="k">end</span>
+    </pre></div>
+      </td>
+    </tr>
+    <tr id='section-6'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-6">&#182;</a>
+        </div>
+        <p>Unlike the <code>replay.initData</code> file, this method of determining race is
+the same across all localizations.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>      <span class="n">attributes</span><span class="o">.</span><span class="n">each</span> <span class="k">do</span> <span class="o">|</span><span class="kp">attr</span><span class="o">|</span>
+        <span class="k">case</span> <span class="kp">attr</span><span class="o">.</span><span class="n">id</span><span class="o">.</span><span class="n">to_i</span>
+        <span class="k">when</span> <span class="mh">0x01f4</span>
+          <span class="vi">@players</span><span class="o">[</span><span class="kp">attr</span><span class="o">.</span><span class="n">player</span> <span class="o">-</span> <span class="mi">1</span><span class="o">][</span><span class="ss">:type</span><span class="o">]</span> <span class="o">=</span> <span class="no">ATTRIBUTES</span><span class="o">[</span><span class="ss">:player_type</span><span class="o">][</span><span class="kp">attr</span><span class="o">.</span><span class="n">sval</span><span class="o">]</span>
+        <span class="k">when</span> <span class="mh">0x0bb9</span>
+          <span class="vi">@players</span><span class="o">[</span><span class="kp">attr</span><span class="o">.</span><span class="n">player</span> <span class="o">-</span> <span class="mi">1</span><span class="o">][</span><span class="ss">:race</span><span class="o">]</span> <span class="o">=</span> <span class="no">ATTRIBUTES</span><span class="o">[</span><span class="ss">:player_race</span><span class="o">][</span><span class="kp">attr</span><span class="o">.</span><span class="n">sval</span><span class="o">]</span>
+        <span class="k">when</span> <span class="mh">0x0bba</span>
+          <span class="vi">@players</span><span class="o">[</span><span class="kp">attr</span><span class="o">.</span><span class="n">player</span> <span class="o">-</span> <span class="mi">1</span><span class="o">][</span><span class="ss">:color</span><span class="o">]</span> <span class="o">=</span> 
+            <span class="no">ATTRIBUTES</span><span class="o">[</span><span class="ss">:player_color</span><span class="o">][</span><span class="kp">attr</span><span class="o">.</span><span class="n">sval</span><span class="o">]</span>
+        <span class="k">end</span>
+      <span class="k">end</span>
+      <span class="vi">@players</span>
+    <span class="k">end</span>
+  </pre></div>
+      </td>
+    </tr>
+    <tr id='section-7'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-7">&#182;</a>
+        </div>
+        <p>The localized map name. Should probably translate it.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>    <span class="k">def</span> <span class="nf">map_name</span>
+      <span class="n">details</span><span class="o">[</span><span class="mi">1</span><span class="o">]</span>
+    <span class="k">end</span>
+  </pre></div>
+      </td>
+    </tr>
+    <tr id='section-8'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-8">&#182;</a>
+        </div>
+        <p>The start date of the game, probably off by a time zone or ten.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>    <span class="k">def</span> <span class="nf">start_date</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-9'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-9">&#182;</a>
+        </div>
+        <p>FIXME: parse this as UTC (possibly requires use of time zone offset
+present in details).</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>      <span class="no">Time</span><span class="o">.</span><span class="n">at</span><span class="p">((</span><span class="n">details</span><span class="o">[</span><span class="mi">5</span><span class="o">]</span> <span class="o">-</span> <span class="mi">116444735995904000</span><span class="p">)</span> <span class="o">/</span> <span class="mi">1</span><span class="n">e7</span><span class="p">)</span>
+    <span class="k">end</span>
+  </pre></div>
+      </td>
+    </tr>
+    <tr id='section-10'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-10">&#182;</a>
+        </div>
+        <p>Two-uppercase-character abbreviation, like <code>NA</code>.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>    <span class="k">def</span> <span class="nf">realm</span>
+      <span class="n">initdata</span><span class="o">.</span><span class="n">rest</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;s2ma&#39;</span><span class="p">)</span><span class="o">[</span><span class="mi">1</span><span class="o">][</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="o">]</span>
+    <span class="k">end</span>
+  </pre></div>
+      </td>
+    </tr>
+    <tr id='section-11'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-11">&#182;</a>
+        </div>
+        <p>Each of these getters are for information contained in the
+<code>replay.attributes.events</code> file, but their exact position cannot be
+assumed from file to file, so we might as well extract them all when
+asked for any one of them.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>    <span class="sx">%w[game_type game_speed category]</span><span class="o">.</span><span class="n">each</span> <span class="k">do</span> <span class="o">|</span><span class="n">lazy_getter</span><span class="o">|</span>
+      <span class="nb">class_eval</span> <span class="o">&lt;&lt;-</span><span class="no">EVAL</span>
+<span class="sh">        def #{lazy_getter}</span>
+<span class="sh">          parse_global_attributes unless defined? @#{lazy_getter}</span>
+<span class="sh">          @#{lazy_getter}</span>
+<span class="sh">        end</span>
+<span class="no">      EVAL</span>
+    <span class="k">end</span>
+  </pre></div>
+      </td>
+    </tr>
+    <tr id='section-12'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-12">&#182;</a>
+        </div>
+        <p>Wrappers for deserializing some JSONish.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>    <span class="kp">private</span>
+    <span class="k">def</span> <span class="nf">user_data</span>
+      <span class="vi">@user_data</span> <span class="o">||=</span> <span class="no">JSONish</span><span class="o">.</span><span class="n">parse</span> <span class="vi">@user_header</span><span class="o">.</span><span class="n">user_data</span>
+    <span class="k">end</span>
+  
+    <span class="k">def</span> <span class="nf">details</span>
+      <span class="vi">@details</span> <span class="o">||=</span> <span class="no">JSONish</span><span class="o">.</span><span class="n">parse</span> <span class="n">read_file</span> <span class="s2">&quot;replay.details&quot;</span>
+    <span class="k">end</span>
+  </pre></div>
+      </td>
+    </tr>
+    <tr id='section-13'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-13">&#182;</a>
+        </div>
+        <p><code>replay.initData</code> has some useful information, but almost all of it can
+be more reliably obtained elsewhere. All that&rsquo;s really useful here is the
+realm the game was played in.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>    <span class="k">def</span> <span class="nf">initdata</span>
+      <span class="vi">@initdata</span> <span class="o">||=</span> <span class="no">InitData</span><span class="o">.</span><span class="n">read</span> <span class="n">read_file</span> <span class="s2">&quot;replay.initData&quot;</span>
+    <span class="k">end</span>
+  
+    <span class="k">class</span> <span class="nc">InitData</span> <span class="o">&lt;</span> <span class="no">BinData</span><span class="o">::</span><span class="no">Record</span>
+      <span class="n">uint8</span> <span class="ss">:num_players</span>
+      <span class="n">array</span> <span class="ss">:players</span><span class="p">,</span> <span class="ss">:initial_length</span> <span class="o">=&gt;</span> <span class="ss">:num_players</span> <span class="k">do</span>
+        <span class="n">uint8</span> <span class="ss">:player_name_length</span>
+        <span class="n">string</span> <span class="ss">:player_name</span><span class="p">,</span> <span class="ss">:length</span> <span class="o">=&gt;</span> <span class="ss">:player_name_length</span>
+        <span class="n">skip</span> <span class="ss">:length</span> <span class="o">=&gt;</span> <span class="mi">5</span>
+      <span class="k">end</span>
+      <span class="n">string</span> <span class="ss">:unknown_24</span><span class="p">,</span> <span class="ss">:length</span> <span class="o">=&gt;</span> <span class="mi">24</span>
+      <span class="n">uint8</span> <span class="ss">:account_length</span>
+      <span class="n">string</span> <span class="ss">:account</span><span class="p">,</span> <span class="ss">:length</span> <span class="o">=&gt;</span> <span class="ss">:account_length</span>
+      <span class="n">rest</span> <span class="ss">:rest</span>
+    <span class="k">end</span>
+  </pre></div>
+      </td>
+    </tr>
+    <tr id='section-14'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-14">&#182;</a>
+        </div>
+        <p><code>replay.attributes.events</code> has plenty of handy information. Here we
+simply deserialize all the attributes, taking into account a format
+change that took place in build 17326, for later processing.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>    <span class="k">def</span> <span class="nf">attributes</span>
+      <span class="k">return</span> <span class="vi">@attributes</span> <span class="k">if</span> <span class="n">defined?</span> <span class="vi">@attributes</span>
+      <span class="n">data</span> <span class="o">=</span> <span class="n">read_file</span> <span class="s2">&quot;replay.attributes.events&quot;</span>
+      <span class="n">data</span><span class="o">.</span><span class="n">slice!</span> <span class="mi">0</span><span class="p">,</span> <span class="p">(</span><span class="n">game_version</span><span class="o">[</span><span class="ss">:build</span><span class="o">]</span> <span class="o">&lt;</span> <span class="mi">17326</span> <span class="o">?</span> <span class="mi">4</span> <span class="p">:</span> <span class="mi">5</span><span class="p">)</span>
+      <span class="vi">@attributes</span> <span class="o">=</span> <span class="o">[]</span>
+      <span class="n">data</span><span class="o">.</span><span class="n">slice!</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span><span class="o">.</span><span class="n">unpack</span><span class="p">(</span><span class="s2">&quot;V&quot;</span><span class="p">)</span><span class="o">[</span><span class="mi">0</span><span class="o">].</span><span class="n">times</span> <span class="k">do</span>
+        <span class="vi">@attributes</span> <span class="o">&lt;&lt;</span> <span class="no">Attribute</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">slice!</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">13</span><span class="p">))</span>
+      <span class="k">end</span>
+      <span class="vi">@attributes</span>
+    <span class="k">end</span>
+  
+    <span class="k">class</span> <span class="nc">Attribute</span> <span class="o">&lt;</span> <span class="no">BinData</span><span class="o">::</span><span class="no">Record</span>
+      <span class="n">endian</span> <span class="ss">:little</span>
+    
+      <span class="n">string</span> <span class="ss">:header</span><span class="p">,</span> <span class="ss">:length</span> <span class="o">=&gt;</span> <span class="mi">4</span>
+      <span class="n">uint32</span> <span class="ss">:id</span>
+      <span class="n">uint8</span>  <span class="ss">:player</span>
+      <span class="n">string</span> <span class="ss">:val</span><span class="p">,</span> <span class="ss">:length</span> <span class="o">=&gt;</span> <span class="mi">4</span>
+    
+      <span class="k">def</span> <span class="nf">sval</span>
+        <span class="n">val</span><span class="o">.</span><span class="n">reverse</span>
+      <span class="k">end</span>
+    <span class="k">end</span>
+  </pre></div>
+      </td>
+    </tr>
+    <tr id='section-15'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-15">&#182;</a>
+        </div>
+        <p>Several pieces of information come from <code>replay.attributes.events</code>, and
+finding one of them is about as hard as finding all of them, so we just
+find all of them here when asked.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>    <span class="k">def</span> <span class="nf">parse_global_attributes</span>
+      <span class="n">attributes</span><span class="o">.</span><span class="n">each</span> <span class="k">do</span> <span class="o">|</span><span class="kp">attr</span><span class="o">|</span>
+        <span class="k">case</span> <span class="kp">attr</span><span class="o">.</span><span class="n">id</span><span class="o">.</span><span class="n">to_i</span>
+        <span class="k">when</span> <span class="mh">0x07d1</span>
+          <span class="vi">@game_type</span> <span class="o">=</span> <span class="kp">attr</span><span class="o">.</span><span class="n">sval</span>
+          <span class="vi">@game_type</span> <span class="o">=</span> <span class="vi">@game_type</span> <span class="o">==</span> <span class="s1">&#39;Cust&#39;</span> <span class="p">?</span> <span class="ss">:custom</span> <span class="p">:</span> <span class="vi">@game_type</span><span class="o">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="o">].</span><span class="n">to_sym</span>
+        <span class="k">when</span> <span class="mh">0x0bb8</span>
+          <span class="vi">@game_speed</span> <span class="o">=</span> <span class="no">ATTRIBUTES</span><span class="o">[</span><span class="ss">:game_speed</span><span class="o">][</span><span class="kp">attr</span><span class="o">.</span><span class="n">sval</span><span class="o">]</span>
+        <span class="k">when</span> <span class="mh">0x0bc1</span>
+          <span class="vi">@category</span> <span class="o">=</span> <span class="no">ATTRIBUTES</span><span class="o">[</span><span class="ss">:category</span><span class="o">][</span><span class="kp">attr</span><span class="o">.</span><span class="n">sval</span><span class="o">]</span>
+        <span class="k">end</span>
+      <span class="k">end</span>
+    <span class="k">end</span>
+  <span class="k">end</span>
+<span class="k">end</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-16'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-16">&#182;</a>
+        </div>
+        <p>Some translations for various values in replays.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre><span class="no">FRAMES_PER_SECOND</span> <span class="o">=</span> <span class="mi">16</span>
+<span class="no">OUTCOMES</span> <span class="o">=</span> <span class="o">[</span><span class="ss">:unknown</span><span class="p">,</span> <span class="ss">:win</span><span class="p">,</span> <span class="ss">:loss</span><span class="o">]</span>
+<span class="no">ATTRIBUTES</span> <span class="o">=</span> <span class="p">{</span>
+  <span class="ss">:player_type</span> <span class="o">=&gt;</span> <span class="p">{</span><span class="s2">&quot;Humn&quot;</span> <span class="o">=&gt;</span> <span class="ss">:human</span><span class="p">,</span> <span class="s2">&quot;Comp&quot;</span> <span class="o">=&gt;</span> <span class="ss">:computer</span><span class="p">},</span>
+  <span class="ss">:player_race</span> <span class="o">=&gt;</span> <span class="p">{</span>
+    <span class="s2">&quot;RAND&quot;</span> <span class="o">=&gt;</span> <span class="ss">:random</span><span class="p">,</span> <span class="s2">&quot;Terr&quot;</span> <span class="o">=&gt;</span> <span class="ss">:terran</span><span class="p">,</span> <span class="s2">&quot;Prot&quot;</span> <span class="o">=&gt;</span> <span class="ss">:protoss</span><span class="p">,</span> <span class="s2">&quot;Zerg&quot;</span> <span class="o">=&gt;</span> <span class="ss">:zerg</span>
+  <span class="p">},</span>
+  <span class="ss">:player_color</span> <span class="o">=&gt;</span> <span class="p">{</span>
+    <span class="s2">&quot;tc01&quot;</span> <span class="o">=&gt;</span> <span class="ss">:red</span><span class="p">,</span>
+    <span class="s2">&quot;tc02&quot;</span> <span class="o">=&gt;</span> <span class="ss">:blue</span><span class="p">,</span>
+    <span class="s2">&quot;tc03&quot;</span> <span class="o">=&gt;</span> <span class="ss">:teal</span><span class="p">,</span>
+    <span class="s2">&quot;tc04&quot;</span> <span class="o">=&gt;</span> <span class="ss">:purple</span><span class="p">,</span>
+    <span class="s2">&quot;tc05&quot;</span> <span class="o">=&gt;</span> <span class="ss">:yellow</span><span class="p">,</span>
+    <span class="s2">&quot;tc06&quot;</span> <span class="o">=&gt;</span> <span class="ss">:orange</span><span class="p">,</span>
+    <span class="s2">&quot;tc07&quot;</span> <span class="o">=&gt;</span> <span class="ss">:green</span><span class="p">,</span>
+    <span class="s2">&quot;tc08&quot;</span> <span class="o">=&gt;</span> <span class="ss">:light_pink</span><span class="p">,</span>
+    <span class="s2">&quot;tc09&quot;</span> <span class="o">=&gt;</span> <span class="ss">:violet</span><span class="p">,</span>
+    <span class="s2">&quot;tc10&quot;</span> <span class="o">=&gt;</span> <span class="ss">:light_grey</span><span class="p">,</span>
+    <span class="s2">&quot;tc11&quot;</span> <span class="o">=&gt;</span> <span class="ss">:dark_green</span><span class="p">,</span>
+    <span class="s2">&quot;tc12&quot;</span> <span class="o">=&gt;</span> <span class="ss">:brown</span><span class="p">,</span>
+    <span class="s2">&quot;tc13&quot;</span> <span class="o">=&gt;</span> <span class="ss">:light_green</span><span class="p">,</span>
+    <span class="s2">&quot;tc14&quot;</span> <span class="o">=&gt;</span> <span class="ss">:dark_grey</span><span class="p">,</span>
+    <span class="s2">&quot;tc15&quot;</span> <span class="o">=&gt;</span> <span class="ss">:pink</span>
+  <span class="p">},</span>
+  <span class="ss">:game_speed</span> <span class="o">=&gt;</span> <span class="p">{</span>
+    <span class="s2">&quot;Slor&quot;</span> <span class="o">=&gt;</span> <span class="ss">:slower</span><span class="p">,</span>
+    <span class="s2">&quot;Slow&quot;</span> <span class="o">=&gt;</span> <span class="ss">:slow</span><span class="p">,</span>
+    <span class="s2">&quot;Norm&quot;</span> <span class="o">=&gt;</span> <span class="ss">:normal</span><span class="p">,</span>
+    <span class="s2">&quot;Fast&quot;</span> <span class="o">=&gt;</span> <span class="ss">:fast</span><span class="p">,</span>
+    <span class="s2">&quot;Fasr&quot;</span> <span class="o">=&gt;</span> <span class="ss">:faster</span>
+  <span class="p">},</span>
+  <span class="ss">:category</span> <span class="o">=&gt;</span> <span class="p">{</span>
+    <span class="s2">&quot;Priv&quot;</span> <span class="o">=&gt;</span> <span class="ss">:private</span><span class="p">,</span>
+    </pre></div>
+      </td>
+    </tr>
+    <tr id='section-17'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-17">&#182;</a>
+        </div>
+        <p><code>Amm</code> is assumed to stand for &ldquo;automatic matchmaker&rdquo;.</p>
+
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>    <span class="s2">&quot;Amm&quot;</span> <span class="o">=&gt;</span> <span class="ss">:ladder</span><span class="p">,</span>
+    <span class="s2">&quot;Pub&quot;</span> <span class="o">=&gt;</span> <span class="ss">:public</span>
+  <span class="p">}</span>
+<span class="p">}</span></pre></div>
+      </td>
+    </tr>
+  </table>
+</div>
+</body>
